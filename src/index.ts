@@ -15,8 +15,8 @@ const instance = axios.create({
   },
 })
 
-const executeExample = async (axios: AxiosInstance) => {
-  const result = await axios
+const getAllAlbumComments = async (axios: AxiosInstance) => {
+  return await axios
     .get('execute', {
       params: {
         code: `
@@ -37,15 +37,30 @@ const executeExample = async (axios: AxiosInstance) => {
         return items;`,
       },
     })
-    return result.data.response
-    // .then((response) => {
-    //   // handle success
-    //   // console.log(response.data)
-    //   console.log(response.data)
-    //   // console.log(response.data.response.items[2].attachments[0].photo)
-    //   // console.log(response.data.response.count)
-    //   return response
-    // })
+    // return response.data.response
+    .then((response) => {
+      // console.log('response :', response)
+      return response.data.response
+    })
+    .catch((error) => {
+      console.log('error :', error)
+    })
+}
+
+const getUsersByIds = async (usersIds: number[], axios: AxiosInstance) => {
+  return await axios
+    .get('users.get', {
+      params: {
+        user_ids: usersIds.join(','),
+      },
+    })
+    .then((response) => {
+      // console.log(response.data.response)
+      return response.data.response
+    })
+    .catch((error) => {
+      console.log('error :', error)
+    })
 }
 
 const getAllComments = (axiosInstance: AxiosInstance) => {
@@ -103,5 +118,28 @@ const getUsersWithoutInstance = () => {
     })
 }
 
-const allComments = await executeExample(instance)
+const allComments = await getAllAlbumComments(instance)  //Получаем все комменты
 console.log('allComments.length :', allComments.length)
+// console.log('allComments[0] :', allComments[28], allComments[55])
+
+const usersIds = new Set<number>()  //получаем массив уникальных пользователей
+allComments.forEach((comment) => {
+  usersIds.add(comment.from_id)
+})
+
+const uniqUsers = await getUsersByIds(Array.from(usersIds), instance)
+uniqUsers.push(
+  {
+    id: -225190306,
+    first_name: 'GroupOwner',
+  }
+)
+
+
+const commentsWithUsers = allComments.map((comment) => {
+  const user = uniqUsers.find((user) => comment.from_id === user.id)
+  comment.from = user
+  return comment
+})
+
+console.log('commentsWithUsers :', commentsWithUsers)
