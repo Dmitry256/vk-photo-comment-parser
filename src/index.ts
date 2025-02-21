@@ -1,5 +1,12 @@
 import axios, {AxiosInstance} from 'axios'
+import ExcelJS from 'exceljs'
 import * as dotenv from 'dotenv'
+import fs from 'fs'
+
+// https://vk.com/album-225190306_307435564
+
+const OWNER_ID = -225190306
+const ALBUM_ID = 307435564 //307654146
 
 dotenv.config()
 
@@ -25,8 +32,8 @@ const getAllAlbumComments = async (axios: AxiosInstance) => {
         var offset = 0;
         while (currentResultLength == 100) {
           var result = API.photos.getAllComments({
-            owner_id: -225190306,
-            album_id: 307654146, //307435564  307654146
+            owner_id: ${OWNER_ID},
+            album_id: ${ALBUM_ID},
             count: 100,
             offset: offset
           });
@@ -62,6 +69,44 @@ const getUsersByIds = async (usersIds: number[], axios: AxiosInstance) => {
       console.log('error :', error)
     })
 }
+
+const exportToExcel = async (
+  comments: any[],
+  filename: string
+): Promise<void> => {
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet('Comments')
+
+  worksheet.columns = [
+    {header: 'Photo URL', key: 'photo_url', width: 30},
+    {header: 'User Name', key: 'user_name', width: 25},
+    {header: 'Comment', key: 'text', width: 77},
+    {header: 'Date', key: 'date', width: 20},
+  ]
+
+  comments.forEach((comment, index, comments) => {
+    worksheet.addRow({
+      photo_url: {
+        text: `Просмотр фото №${comment.pid}`, // Текст ссылки (можно динамически генерировать)
+        hyperlink: comment.photo_url, // URL
+      },
+      user_name: comment.from
+        ? `${comment.from.first_name} ${comment.from.last_name}`
+        : 'owner',
+      text: comment.text,
+      date: new Date(comment.date * 1000).toLocaleString(),
+    })
+    if (comment.pid !== comments[index + 1]?.pid) worksheet.addRow({}).number
+  })
+
+  await workbook.xlsx.writeFile(filename)
+  console.log(`Exported to ${filename}`)
+}
+
+const downloadImage = async (imageUrl: string, fileName: string) => {
+  const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+  fs.writeFileSync(fileName, Buffer.from(response.data, 'binary'));
+};
 
 const getAllComments = (axiosInstance: AxiosInstance) => {
   axiosInstance
@@ -118,28 +163,35 @@ const getUsersWithoutInstance = () => {
     })
 }
 
-const allComments = await getAllAlbumComments(instance)  //Получаем все комменты
+const allComments: any[] = await getAllAlbumComments(instance) //Получаем все комменты
 console.log('allComments.length :', allComments.length)
 // console.log('allComments[0] :', allComments[28], allComments[55])
 
-const usersIds = new Set<number>()  //получаем массив уникальных пользователей
+// сортируем комментарии
+allComments.reverse().sort((a, b) => a.pid - b.pid) // TODO посмотреть , может есть возможность в запросе отсортировать
+
+const usersIds = new Set<number>() //получаем массив уникальных пользователей
 allComments.forEach((comment) => {
   usersIds.add(comment.from_id)
 })
 
 const uniqUsers = await getUsersByIds(Array.from(usersIds), instance)
-uniqUsers.push(
-  {
-    id: -225190306,
-    first_name: 'GroupOwner',
-  }
-)
-
+// костыль добавляющий владельца группы
+uniqUsers.push({
+  id: -225190306,
+  first_name: 'Владычица',
+  last_name: 'группы!!!',
+})
 
 const commentsWithUsers = allComments.map((comment) => {
   const user = uniqUsers.find((user) => comment.from_id === user.id)
   comment.from = user
+  comment.photo_url = `https://vk.com/photo${OWNER_ID}_${comment.pid}`
   return comment
 })
 
 console.log('commentsWithUsers :', commentsWithUsers)
+
+exportToExcel(commentsWithUsers, 'test.xls')
+
+downloadImage('https://sun9-40.userapi.com/impg/HVMXzXhOC4OhtX0jx3XWKSgR6jkpitutGCzG2g/BOrjAmGiorQ.jpg?size=800x800&quality=95&sign=a0cb4f940c6382a8af329c7b4a658836&type=album', 'testPhoto.jpg')
