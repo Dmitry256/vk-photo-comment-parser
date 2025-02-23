@@ -47,11 +47,12 @@ const getAllAlbumComments = async (axios: AxiosInstance) => {
     // return response.data.response
     .then((response) => {
       // console.log('response :', response)
+      if (response.data.error) throw Error(response.data.error.error_msg)
       return response.data.response
     })
-    .catch((error) => {
-      console.log('error :', error)
-    })
+    // .catch((error) => {
+    //   console.log('error :', error)
+    // })
 }
 
 const getUsersByIds = async (usersIds: number[], axios: AxiosInstance) => {
@@ -85,7 +86,7 @@ const exportToExcel = async (
   ]
 
   comments.forEach((comment, index, comments) => {
-    worksheet.addRow({
+    const row = worksheet.addRow({
       photo_url: {
         text: `Просмотр фото №${comment.pid}`, // Текст ссылки (можно динамически генерировать)
         hyperlink: comment.photo_url, // URL
@@ -96,7 +97,20 @@ const exportToExcel = async (
       text: comment.text,
       date: new Date(comment.date * 1000).toLocaleString(),
     })
-    if (comment.pid !== comments[index + 1]?.pid) worksheet.addRow({}).number
+    if (comment.pid !== comments[index + 1]?.pid) {
+      const rowNumber = row.number + 1
+      console.log('rowNumber :', rowNumber)
+      const imageId = workbook.addImage({
+        filename: 'testPhoto.jpg',
+        extension: 'jpeg',
+      })
+      worksheet.addImage(imageId, {
+        tl: {col: 0, row: rowNumber - 1},
+        ext: {width: 250, height: 250},
+      })
+      const imageRow = worksheet.getRow(rowNumber )
+      imageRow.height = 200
+    }
   })
 
   await workbook.xlsx.writeFile(filename)
@@ -104,9 +118,9 @@ const exportToExcel = async (
 }
 
 const downloadImage = async (imageUrl: string, fileName: string) => {
-  const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-  fs.writeFileSync(fileName, Buffer.from(response.data, 'binary'));
-};
+  const response = await axios.get(imageUrl, {responseType: 'arraybuffer'})
+  fs.writeFileSync(fileName, Buffer.from(response.data, 'binary'))
+}
 
 const getAllComments = (axiosInstance: AxiosInstance) => {
   axiosInstance
@@ -194,4 +208,7 @@ console.log('commentsWithUsers :', commentsWithUsers)
 
 exportToExcel(commentsWithUsers, 'test.xls')
 
-downloadImage('https://sun9-40.userapi.com/impg/HVMXzXhOC4OhtX0jx3XWKSgR6jkpitutGCzG2g/BOrjAmGiorQ.jpg?size=800x800&quality=95&sign=a0cb4f940c6382a8af329c7b4a658836&type=album', 'testPhoto.jpg')
+downloadImage(
+  'https://sun9-40.userapi.com/impg/HVMXzXhOC4OhtX0jx3XWKSgR6jkpitutGCzG2g/BOrjAmGiorQ.jpg?size=800x800&quality=95&sign=a0cb4f940c6382a8af329c7b4a658836&type=album',
+  'testPhoto.jpg'
+)
