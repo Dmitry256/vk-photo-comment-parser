@@ -105,13 +105,19 @@ const getAlbumPhotosOrder = async (axios: AxiosInstance) => {
     })
 }
 
-const calculateLines = (text: string, charsPerLine: number = 80): number => {
+const calculateLines = (text: string, charsPerLine: number): number => {
   return text
     .split('\n')
     .reduce((acc: number, currentLine: string) => {
       acc += Math.ceil(currentLine.length / charsPerLine)
       return acc
     }, 0)
+}
+
+const getPrice = (text: string) => {
+  const regexp = /(?:Стоимость|Цена)\s*[:—-\s]*\s*([^₽\n]+)/i
+  const result = regexp.exec(text)
+  return result?.[1] ?? 0
 }
 
 const exportToExcel = async (
@@ -173,11 +179,13 @@ const exportToExcel = async (
         ext: {width: 100, height: 100},
       })
       const imageRow = worksheet.getRow(rowNumber)
+      const priceCell = worksheet.getCell(`D${rowNumber}`)
       const descriptionCell = worksheet.getCell(`E${rowNumber}`)
       const descriptionText = photos.find(
         (photo) => photo.id === comment.pid
       ).text
       descriptionCell.value = descriptionText
+      priceCell.value = getPrice(descriptionText)
       imageRow.height = Math.max(77, calculateLines(descriptionText, 26) * 20)
     }
 
@@ -192,7 +200,7 @@ const exportToExcel = async (
       text: comment.text,
     })
 
-    row.height = calculateLines(comment.text) * 17 // Определяем высоту строки по количеству текста комментария
+    row.height = calculateLines(comment.text, 28) * 17 // Определяем высоту строки по количеству текста комментария
 
     if (comment.attachments) {
       const commentPhotos = comment.attachments
