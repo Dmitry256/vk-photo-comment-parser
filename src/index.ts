@@ -5,9 +5,11 @@ import fs from 'fs'
 
 // https://vk.com/album-225190306_307435564
 // https://vk.com/album-225190306_307783090
+// https://vk.com/album-225190306_307826349
+// https://vk.com/album-225190306_307858232
 
 const OWNER_ID = -225190306
-const ALBUM_ID = 307783090
+const ALBUM_ID = 307858232
 const IMAGES_FOLDER = '.temp/images/'
 
 dotenv.config()
@@ -82,6 +84,36 @@ const getPhotos = async (photosIds: string[], axios: AxiosInstance) => {
     })
 }
 
+const getAlbumPhotosOrder = async (axios: AxiosInstance) => {
+  return await axios
+    .get('photos.get', {
+      params: {
+        owner_id: OWNER_ID,
+        album_id: ALBUM_ID,
+        count: 500,
+      },
+    })
+    .then((response) => {
+      const albumPhotos = response.data.response.items
+      const albumPhotosOrder = albumPhotos.map((photo) => {
+        return photo.id
+      })
+      return albumPhotosOrder
+    })
+    .catch((error) => {
+      console.log('error :', error)
+    })
+}
+
+const calculateLines = (text: string, charsPerLine: number = 80): number => {
+  return text
+    .split('\n')
+    .reduce((acc: number, currentLine: string) => {
+      acc += Math.ceil(currentLine.length / charsPerLine)
+      return acc
+    }, 0)
+}
+
 const exportToExcel = async (
   comments: any[],
   photos: any[],
@@ -91,10 +123,19 @@ const exportToExcel = async (
   const worksheet = workbook.addWorksheet('Comments')
 
   worksheet.columns = [
-    {header: 'Photo URL', key: 'photo_url', width: 30},
-    {header: 'User Name', key: 'user_name', width: 25},
+    {header: 'Фото', key: 'photo_url', width: 5},
     {
-      header: 'Comment',
+      header: 'Имя',
+      key: 'user_name',
+      width: 21,
+      style: {
+        alignment: {
+          wrapText: true,
+        },
+      },
+    },
+    {
+      header: 'Комментарий',
       key: 'text',
       width: 30,
       style: {
@@ -103,23 +144,55 @@ const exportToExcel = async (
         },
       },
     },
-    {header: 'Date', key: 'date', width: 20},
-    {width: 27},
-    {width: 27},
+    {header: 'Цена', key: 'price', width: 5},
+    {
+      header: `Описание`,
+      width: 27,
+      style: {
+        alignment: {
+          wrapText: true,
+        },
+      },
+    },
+    {width: 11},
+    {width: 11},
   ]
 
+  const albumPhotosOrder = await getAlbumPhotosOrder(instance)
+
   comments.forEach((comment, index, comments) => {
+    if (index === 0 || comment.pid !== comments[index - 1]?.pid) {
+      const row = worksheet.addRow({})
+      const rowNumber = row.number
+      const imageId = workbook.addImage({
+        filename: `${IMAGES_FOLDER}${comment.pid}.jpg`,
+        extension: 'jpeg',
+      })
+      worksheet.addImage(imageId, {
+        tl: {col: 5, row: rowNumber - 1},
+        ext: {width: 100, height: 100},
+      })
+      const imageRow = worksheet.getRow(rowNumber)
+      const descriptionCell = worksheet.getCell(`E${rowNumber}`)
+      const descriptionText = photos.find(
+        (photo) => photo.id === comment.pid
+      ).text
+      descriptionCell.value = descriptionText
+      imageRow.height = Math.max(77, calculateLines(descriptionText, 26) * 20)
+    }
+
     const row = worksheet.addRow({
       photo_url: {
-        text: `Просмотр фото №${comment.pid}`,
+        text: albumPhotosOrder.indexOf(comment.pid) + 1,
         hyperlink: comment.photo_url,
       },
       user_name: comment.from
         ? `${comment.from.first_name} ${comment.from.last_name}`
-        : 'owner',
+        : 'Я',
       text: comment.text,
-      date: new Date(comment.date * 1000).toLocaleString(),
     })
+
+    row.height = calculateLines(comment.text) * 17 // Определяем высоту строки по количеству текста комментария
 
     if (comment.attachments) {
       const commentPhotos = comment.attachments
@@ -134,28 +207,10 @@ const exportToExcel = async (
         })
         worksheet.addImage(imageId, {
           tl: {col: 4 + i, row: row.number - 1},
-          ext: {width: 250, height: 250},
+          ext: {width: 100, height: 100},
         })
       }
-      row.height = 200
-    }
-
-    if (comment.pid !== comments[index + 1]?.pid) {
-      const rowNumber = row.number + 1
-      const imageId = workbook.addImage({
-        filename: `${IMAGES_FOLDER}${comment.pid}.jpg`,
-        extension: 'jpeg',
-      })
-      worksheet.addImage(imageId, {
-        tl: {col: 0, row: rowNumber - 1},
-        ext: {width: 250, height: 250},
-      })
-      const imageRow = worksheet.getRow(rowNumber)
-      const descriptionCell = worksheet.getCell(`C${rowNumber}`)
-      descriptionCell.value = photos.find(
-        (photo) => photo.id === comment.pid
-      ).text
-      imageRow.height = 200
+      row.height = 77
     }
   })
 
@@ -190,8 +245,8 @@ const albumPhotos = await getPhotos(Array.from(photosIds), instance)
 const photos = albumPhotos.concat(...photosFromComments)
 
 for (const photo of photos) {
-  const pSizeUrl = photo.sizes.find((size) => size.type === 'p').url
   if (!fs.existsSync(`${IMAGES_FOLDER}${photo}.jpg`)) {
+    const pSizeUrl = photo.sizes.find((size) => size.type === 'm').url
     await downloadImage(pSizeUrl, `${IMAGES_FOLDER}${photo.id}.jpg`)
   }
 }
