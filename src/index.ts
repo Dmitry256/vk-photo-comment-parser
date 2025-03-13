@@ -3,9 +3,7 @@ import ExcelJS from 'exceljs'
 import * as dotenv from 'dotenv'
 import fs from 'fs'
 
-// const OWNER_ID = -225190306
-// const ALBUM_ID = 307858232
-const ALBUM_URL = 'https://vk.com/album-225190306_307826349'
+const ALBUM_URL = 'https://vk.com/album-225190306_308012963'
 const IMAGES_FOLDER = '.temp/images/'
 
 dotenv.config()
