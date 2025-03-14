@@ -3,13 +3,13 @@ import ExcelJS from 'exceljs'
 import * as dotenv from 'dotenv'
 import fs from 'fs'
 
-const ALBUM_URL = 'https://vk.com/album-225190306_308012963'
+const ALBUM_URL = 'https://vk.com/album-225190306_307826352'
 const IMAGES_FOLDER = '.temp/images/'
 
 dotenv.config()
 
 // настройка instance of axios
-const instance = axios.create({
+const axiosInstance = axios.create({
   baseURL: process.env.BASE_URL,
   headers: {
     Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
@@ -165,7 +165,7 @@ const exportToExcel = async (
     {header: '№', key: 'photo_num', width: 5},
   ]
 
-  const albumPhotosOrder = await getAlbumPhotosOrder(instance)
+  const albumPhotosOrder = await getAlbumPhotosOrder(axiosInstance)
 
   let price = 0
   comments.forEach((comment, index, comments) => {
@@ -253,7 +253,7 @@ const downloadImage = async (imageUrl: string, fileName: string) => {
   fs.writeFileSync(fileName, Buffer.from(response.data, 'binary'))
 }
 
-const allComments: any[] = await getAllAlbumComments(instance) // Get all comments
+const allComments: any[] = await getAllAlbumComments(axiosInstance) // Get all comments
 
 // sort comments
 allComments.reverse().sort((a, b) => a.pid - b.pid)
@@ -272,7 +272,7 @@ allComments.forEach((comment) => {
     })
 })
 
-const albumPhotos = await getPhotos(Array.from(photosIds), instance)
+const albumPhotos = await getPhotos(Array.from(photosIds), axiosInstance)
 const photos = albumPhotos.concat(...photosFromComments)
 
 for (const photo of photos) {
@@ -282,7 +282,7 @@ for (const photo of photos) {
   }
 }
 
-const uniqUsers = await getUsersByIds(Array.from(usersIds), instance)
+const uniqUsers = await getUsersByIds(Array.from(usersIds), axiosInstance)
 
 const commentsWithUsers = allComments.map((comment) => {
   const user = uniqUsers.find((user) => comment.from_id === user.id)

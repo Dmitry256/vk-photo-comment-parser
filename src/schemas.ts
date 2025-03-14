@@ -18,3 +18,5 @@ export const userCommentSchema = z.object({
 })
 
 export type UserComment = z.infer<typeof userCommentSchema>
+
+export type PurchaseType =  'RUSSIA' | 'CHINA'

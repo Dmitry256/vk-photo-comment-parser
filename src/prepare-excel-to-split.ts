@@ -1,5 +1,12 @@
 import ExcelJS from 'exceljs'
-import {UserComment, userCommentSchema} from './schemas'
+import {PurchaseType, UserComment, userCommentSchema} from './schemas'
+
+const PURCHASE_TYPE: PurchaseType = 'CHINA'
+const PURCHASE_CONFIG: Record<PurchaseType, {header: string; ratio: number}> =
+{
+  CHINA: {header: '+20%', ratio: 1.2},
+  RUSSIA: {header: '+0%', ratio: 1},
+}
 
 const backupFirstWorksheet = (workbook: ExcelJS.Workbook): void => {
   const hasBackup = workbook.worksheets.some((sheet) =>
@@ -32,7 +39,10 @@ const remImgFirstWorksheet = (workbook: ExcelJS.Workbook): void => {
   }
 }
 
-const prepareToSplit = async (filePath: string): Promise<void> => {
+const prepareToSplit = async (
+  filePath: string,
+  purchaseType: PurchaseType
+): Promise<void> => {
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.readFile(filePath)
 
@@ -104,13 +114,15 @@ const prepareToSplit = async (filePath: string): Promise<void> => {
     }
   })
 
-  // 5. Заменяем колонку с номером фото на цену +20%
+  // 5. Заменяем колонку с номером фото на цену +20% (только в случае Китайской закупки)
+
+  const {header, ratio} = PURCHASE_CONFIG[purchaseType]
 
   worksheet.getColumn('E').eachCell((cell, rowNumber) => {
     if (rowNumber === 1) {
-      cell.value = '+20%'
-    } else {
-      cell.value = {formula: `D${rowNumber}*1.2`}
+      cell.value = header
+    } else if (cell.value) {
+      cell.value = {formula: `D${rowNumber}*${ratio}`}
     }
   })
 
@@ -119,6 +131,6 @@ const prepareToSplit = async (filePath: string): Promise<void> => {
 }
 
 // Запуск обработки
-prepareToSplit('output/test.xls')
+prepareToSplit('output/test.xls', PURCHASE_TYPE)
   .then(() => console.log('Файлы успешно созданы!'))
   .catch(console.error)
